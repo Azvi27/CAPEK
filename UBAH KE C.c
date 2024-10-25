@@ -595,3 +595,4 @@ uint8_t Modbus_validateRequest(Modbus* modbus) {
     }
     return 0;
 }
+
