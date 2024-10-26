@@ -1,57 +1,52 @@
 #ifndef MODBUS_RTU_H
 #define MODBUS_RTU_H
 
-#include <inttypes.h>
-#include "Arduino.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
 
-typedef struct
-{
-    uint8_t u8id;          /*!< Slave address between 1 and 247. 0 means broadcast */
-    uint8_t u8fct;         /*!< Function code: 1, 2, 3, 4, 5, 6, 15 or 16 */
-    uint16_t u16RegAdd;    /*!< Address of the first register to access at slave/s */
-    uint16_t u16CoilsNo;   /*!< Number of coils or registers to access */
-    uint16_t *au16reg;     /*!< Pointer to memory image in master */
+typedef struct {
+    uint8_t u8id;
+    uint8_t u8fct;
+    uint16_t u16RegAdd;
+    uint16_t u16CoilsNo;
+    uint16_t *au16reg;
 } modbus_t;
 
-enum
-{
+enum {
     RESPONSE_SIZE = 6,
     EXCEPTION_SIZE = 3,
     CHECKSUM_SIZE = 2
 };
 
-enum MESSAGE
-{
-    ID = 0, //!< ID field
-    FUNC, //!< Function code position
-    ADD_HI, //!< Address high byte
-    ADD_LO, //!< Address low byte
-    NB_HI, //!< Number of coils or registers high byte
-    NB_LO, //!< Number of coils or registers low byte
-    BYTE_CNT  //!< byte counter
+enum MESSAGE {
+    ID = 0,
+    FUNC,
+    ADD_HI,
+    ADD_LO,
+    NB_HI,
+    NB_LO,
+    BYTE_CNT
 };
 
-enum MB_FC
-{
-    MB_FC_NONE = 0,   /*!< null operator */
-    MB_FC_READ_COILS = 1, /*!< FCT=1 -> read coils or digital outputs */
-    MB_FC_READ_DISCRETE_INPUT = 2, /*!< FCT=2 -> read digital inputs */
-    MB_FC_READ_REGISTERS = 3, /*!< FCT=3 -> read registers or analog outputs */
-    MB_FC_READ_INPUT_REGISTER = 4, /*!< FCT=4 -> read analog inputs */
-    MB_FC_WRITE_COIL = 5, /*!< FCT=5 -> write single coil or output */
-    MB_FC_WRITE_REGISTER = 6, /*!< FCT=6 -> write single register */
-    MB_FC_WRITE_MULTIPLE_COILS = 15, /*!< FCT=15 -> write multiple coils or outputs */
-    MB_FC_WRITE_MULTIPLE_REGISTERS = 16 /*!< FCT=16 -> write multiple registers */
+enum MB_FC {
+    MB_FC_NONE = 0,
+    MB_FC_READ_COILS = 1,
+    MB_FC_READ_DISCRETE_INPUT = 2,
+    MB_FC_READ_REGISTERS = 3,
+    MB_FC_READ_INPUT_REGISTER = 4,
+    MB_FC_WRITE_COIL = 5,
+    MB_FC_WRITE_REGISTER = 6,
+    MB_FC_WRITE_MULTIPLE_COILS = 15,
+    MB_FC_WRITE_MULTIPLE_REGISTERS = 16
 };
 
-enum COM_STATES
-{
+enum COM_STATES {
     COM_IDLE = 0,
     COM_WAITING = 1
 };
 
-enum ERR_LIST
-{
+enum ERR_LIST {
     ERR_NOT_MASTER = -1,
     ERR_POLLING = -2,
     ERR_BUFF_OVERFLOW = -3,
@@ -59,8 +54,7 @@ enum ERR_LIST
     ERR_EXCEPTION = -5
 };
 
-enum
-{
+enum {
     NO_REPLY = 255,
     EXC_FUNC_CODE = 1,
     EXC_ADDR_RANGE = 2,
@@ -68,8 +62,7 @@ enum
     EXC_EXECUTE = 4
 };
 
-const unsigned char fctsupported[] =
-{
+static const unsigned char fctsupported[] = {
     MB_FC_READ_COILS,
     MB_FC_READ_DISCRETE_INPUT,
     MB_FC_READ_REGISTERS,
@@ -80,14 +73,13 @@ const unsigned char fctsupported[] =
     MB_FC_WRITE_MULTIPLE_REGISTERS
 };
 
-#define T35  5
-#define MAX_BUFFER  64 //!< maximum size for the communication buffer in bytes
+#define T35 5
+#define MAX_BUFFER 64
 
-typedef struct
-{
-    Stream *port; //!< Pointer to Stream class object (Either HardwareSerial or SoftwareSerial)
-    uint8_t u8id; //!< 0=master, 1..247=slave number
-    uint8_t u8txenpin; //!< flow control pin: 0=USB or RS-232 mode, >1=RS-485 mode
+typedef struct Modbus {
+    FILE *port;
+    uint8_t u8id;
+    uint8_t u8txenpin;
     uint8_t u8state;
     uint8_t u8lastError;
     uint8_t au8Buffer[MAX_BUFFER];
@@ -98,68 +90,42 @@ typedef struct
     uint16_t u16timeOut;
     uint32_t u32time, u32timeOut, u32overTime;
     uint8_t u8regsize;
+
+    void (*sendTxBuffer)(struct Modbus*);
+    int8_t (*getRxBuffer)(struct Modbus*);
+    uint16_t (*calcCRC)(struct Modbus*, uint8_t u8length);
+    uint8_t (*validateAnswer)(struct Modbus*);
+    uint8_t (*validateRequest)(struct Modbus*);
+    void (*get_FC1)(struct Modbus*);
+    void (*get_FC3)(struct Modbus*);
+    int8_t (*process_FC1)(struct Modbus*, uint16_t *regs, uint8_t u8size);
+    int8_t (*process_FC3)(struct Modbus*, uint16_t *regs, uint8_t u8size);
+    int8_t (*process_FC5)(struct Modbus*, uint16_t *regs, uint8_t u8size);
+    int8_t (*process_FC6)(struct Modbus*, uint16_t *regs, uint8_t u8size);
+    int8_t (*process_FC15)(struct Modbus*, uint16_t *regs, uint8_t u8size);
+    int8_t (*process_FC16)(struct Modbus*, uint16_t *regs, uint8_t u8size);
+    void (*buildException)(struct Modbus*, uint8_t u8exception);
+
+    void (*start)(struct Modbus*);
+    void (*setTimeOut)(struct Modbus*, uint16_t u16timeOut);
+    uint16_t (*getTimeOut)(struct Modbus*);
+    bool (*getTimeOutState)(struct Modbus*);
+    int8_t (*query)(struct Modbus*, modbus_t telegram);
+    int8_t (*poll)(struct Modbus*);
+    int8_t (*pollWithRegs)(struct Modbus*, uint16_t *regs, uint8_t u8size);
+    uint16_t (*getInCnt)(struct Modbus*);
+    uint16_t (*getOutCnt)(struct Modbus*);
+    uint16_t (*getErrCnt)(struct Modbus*);
+    uint8_t (*getID)(struct Modbus*);
+    uint8_t (*getState)(struct Modbus*);
+    uint8_t (*getLastError)(struct Modbus*);
+    void (*setID)(struct Modbus*, uint8_t u8id);
+    void (*setTxendPinOverTime)(struct Modbus*, uint32_t u32overTime);
+    void (*end)(struct Modbus*);
 } Modbus;
 
-void Modbus_init(Modbus *modbus, uint8_t u8id, Stream *port, uint8_t u8txenpin)
-{
-    modbus->u8id = u8id;
-    modbus->port = port;
-    modbus->u8txenpin = u8txenpin;
-    modbus->u8state = COM_IDLE;
-    modbus->u8lastError = 0;
-    modbus->u8BufferSize = 0;
-    modbus->u16InCnt = 0;
-    modbus->u16OutCnt = 0;
-    modbus->u16errCnt = 0;
-    modbus->u16timeOut = 1000; // default timeout
-}
-
-void Modbus_start(Modbus *modbus)
-{
-    // Start the Modbus communication
-    modbus->u8state = COM_WAITING;
-}
-
-void Modbus_setTimeOut(Modbus *modbus, uint16_t u16timeOut)
-{
-    modbus->u16timeOut = u16timeOut;
-}
-
-uint16_t Modbus_getTimeOut(Modbus *modbus)
-{
-    return modbus->u16timeOut;
-}
-
-uint8_t Modbus_getID(Modbus *modbus)
-{
-    return modbus->u8id;
-}
-
-void Modbus_setID(Modbus *modbus, uint8_t u8id)
-{
-    modbus->u8id = u8id;
-}
-
-uint16_t Modbus_getInCnt(Modbus *modbus)
-{
-    return modbus->u16InCnt;
-}
-
-uint16_t Modbus_getOutCnt(Modbus *modbus)
-{
-    return modbus->u16OutCnt;
-}
-
-uint16_t Modbus_getErrCnt(Modbus *modbus)
-{
-    return modbus->u16errCnt;
-}
-
-uint8_t Modbus_getLastError(Modbus *modbus)
-{
-    return modbus->u8lastError;
-}
-
-// Additional functions for processing Modbus requests, sending buffers, etc., need to be implemented
+Modbus* Modbus_new(uint8_t u8id, FILE* port, uint8_t u8txenpin);
+void Modbus_delete(Modbus* modbus);
 
 #endif // MODBUS_RTU_H
+
